@@ -51,14 +51,14 @@ Joint joint1(
         "joint1",
         DJIMotor::GM6020,
         (DJIMotor::Param) { 0x01, E_CAN1, DJIMotor::CURRENT })),
-    2138, 160, -160, 0,
+    4199, 160, -160, 0,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0)
 );
 
 float joint2_forward(float deg) {
     float temp_tor = 0;
-    temp_tor = -std::sin(deg)*SERIES_MASS*G*SERIES_JOINT2_L;
+    temp_tor = -std::cos(deg)*SERIES_MASS*G*SERIES_JOINT2_L;
     return temp_tor;
 }
 
@@ -67,7 +67,7 @@ Joint joint2(
         "joint2",
         DJIMotor::GM6020,
         (DJIMotor::Param) { 0x02, E_CAN1, DJIMotor::CURRENT })),
-    6047, 180, -180, 1,
+    4000, 180, -180, 1,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0),
     joint2_forward
@@ -78,7 +78,7 @@ Joint joint3(
         "joint3",
         DJIMotor::GM6020,
         (DJIMotor::Param) { 0x03, E_CAN1, DJIMotor::CURRENT })),
-    2000, 160, -160, 0,
+    8142, 160, -160, 0,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0)
 );
@@ -128,7 +128,7 @@ void app_custom_task(void *args) {
     OS::Task::SleepMilliseconds(3000);
     float tor[3] = {0, 0, 0};;
     float deg[3];
-    float target_force[3] = {0, 0, 25};
+    float target_force[3] = {0, 0, 26};
     float deg_t[3];
     float pos_t[3] = {10, -22, -200};
     DM_Motor1.enable(),DM_Motor2.enable(),DM_Motor3.enable();
@@ -188,9 +188,9 @@ void app_custom_task(void *args) {
             rpy[0],
             rpy[1],
             rpy[2],
-            // joint2.motor_ctrl_->output,
-            // joint2.t_tor * GM6020_TOR_TO_COUNT,
-            joint2.motor_ctrl_->device()->angle
+            joint1.motor_ctrl_->device()->angle,
+            joint2.motor_ctrl_->device()->angle,
+            joint3.motor_ctrl_->device()->angle
             );
 
         if(++c_count == 100) {
