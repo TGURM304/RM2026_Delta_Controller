@@ -114,7 +114,7 @@ static void transmit(uint16_t cmd_id, uint8_t *s, uint16_t l) {
 float pos[3], rpy[3];
 void send_msg_to_referee() {
     app_referee_custom_controller_t pkg = {
-        .pos_data = { pos[0], pos[1], pos[2] },
+        .pos_data = { pos[0] * 0.001f, pos[1] * 0.001f, pos[2] * 0.001f },
         .rpy_data = { rpy[0], rpy[1], rpy[2] }
     };
     transmit(0x0302, reinterpret_cast<uint8_t *>(&pkg), sizeof(pkg));
@@ -125,13 +125,19 @@ void app_custom_task(void *args) {
     // Wait for system init.
     while(!app_sys_ready()) OS::Task::SleepMilliseconds(10);
 
+    while((DM_Motor1.status.err & DM_Motor2.status.err & DM_Motor3.status.err) != 1) {
+        DM_Motor1.enable(), OS::Task::SleepMilliseconds(1);
+        DM_Motor2.enable(), OS::Task::SleepMilliseconds(1);
+        DM_Motor3.enable(), OS::Task::SleepMilliseconds(1);
+        OS::Task::SleepMilliseconds(20);
+    }
+
     OS::Task::SleepMilliseconds(3000);
     float tor[3] = {0, 0, 0};;
     float deg[3];
     float target_force[3] = {0, 0, 26};
     float deg_t[3];
     float pos_t[3] = {10, -22, -200};
-    DM_Motor1.enable(),DM_Motor2.enable(),DM_Motor3.enable();
 
     // bsp_uart_set_callback(E_UART_REFEREE, get_num);
 
@@ -208,9 +214,9 @@ void app_custom_task(void *args) {
 }
 
 void app_custom_init() {
-    DM_Motor1.init(),DM_Motor2.init(),DM_Motor3.init();
-
-    DM_Motor1.enable(),DM_Motor2.enable(),DM_Motor3.enable();
+    DM_Motor1.init(), OS::Task::SleepMilliseconds(1);
+    DM_Motor2.init(), OS::Task::SleepMilliseconds(1);
+    DM_Motor3.init(), OS::Task::SleepMilliseconds(1);
 
     joint1.joint_init(), joint2.joint_init(), joint3.joint_init();
 }
