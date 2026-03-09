@@ -151,6 +151,9 @@ void app_custom_task(void *args) {
         pos_t[1] = -22.0f + std::fabs(count)/50.0f;
         pos_t[2] = -200.0f + std::fabs(count)/50.0f;
 
+        // DM_Motor1.control(0,0,0,0,0);
+        // DM_Motor2.control(0,0,0,0,0);
+        // DM_Motor3.control(0,0,0,0,0);
         DM_Motor1.control(0,0,0,0,tor[0]);
         DM_Motor2.control(0,0,0,0,tor[1]);
         DM_Motor3.control(0,0,0,0,tor[2]);
