@@ -15,6 +15,11 @@
 #include "app_referee_def.h"
 #include "ctrl_motor_base_pid.h"
 
+#include "bsp_can.h"
+#include "bsp_time.h"
+
+#include <algorithm>
+
 #include "app_sys.h"
 #include "dev_motor_dji.h"
 #include "sys_task.h"
@@ -120,6 +125,17 @@ void send_msg_to_referee() {
     transmit(0x0302, reinterpret_cast<uint8_t *>(&pkg), sizeof(pkg));
 }
 
+// can通信
+app_msg_hand_to_custom hand_data{};
+bool hand_state = false;
+unsigned int hand_timestamp = 0;
+
+void hand_can_raw_recv(bsp_can_msg_t *msg) {
+    hand_timestamp = bsp_time_get_ms();
+    std::copy_n(msg->data, sizeof(hand_data),
+                reinterpret_cast<uint8_t*>(&hand_data));
+}
+
 // 静态任务，在 CubeMX 中配置
 void app_custom_task(void *args) {
     // Wait for system init.
@@ -133,6 +149,9 @@ void app_custom_task(void *args) {
     }
 
     OS::Task::SleepMilliseconds(3000);
+    
+    bsp_can_set_callback(E_CAN3, 0x147, hand_can_raw_recv);
+
     float tor[3] = {0, 0, 0};;
     float deg[3];
     float target_force[3] = {0, 0, 26};
@@ -150,6 +169,15 @@ void app_custom_task(void *args) {
         }
         pos_t[1] = -22.0f + std::fabs(count)/50.0f;
         pos_t[2] = -200.0f + std::fabs(count)/50.0f;
+
+        if(bsp_time_get_ms() - hand_timestamp < 100) {
+            hand_state = true;
+        }else {
+            hand_state = false;
+            hand_data.key_state[0] = hand_data.key_state[1] = 0;
+            hand_data.key_state[2] = hand_data.key_state[3] = 0;
+            hand_data.rs_data[0] = hand_data.rs_data[1] = 0;
+        }
 
         // DM_Motor1.control(0,0,0,0,0);
         // DM_Motor2.control(0,0,0,0,0);
@@ -191,15 +219,19 @@ void app_custom_task(void *args) {
             pos[0],
             pos[1],
             pos[2],
-            // DM_Motor1.status.torque,
-            // DM_Motor2.status.torque,
-            // DM_Motor3.status.torque,
-            rpy[0],
-            rpy[1],
-            rpy[2],
-            joint1.motor_ctrl_->device()->angle,
-            joint2.motor_ctrl_->device()->angle,
-            joint3.motor_ctrl_->device()->angle
+            hand_data.key_state[0],
+            hand_data.key_state[1],
+            hand_data.key_state[2],
+            hand_data.key_state[3],
+            hand_data.rs_data[0],
+            hand_data.rs_data[1],
+            hand_timestamp
+            // rpy[0],
+            // rpy[1],
+            // rpy[2],
+            // joint1.motor_ctrl_->device()->angle,
+            // joint2.motor_ctrl_->device()->angle,
+            // joint3.motor_ctrl_->device()->angle
             );
 
         if(++c_count == 100) {

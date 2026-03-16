@@ -4,21 +4,9 @@
 #ifndef APP_MSG_DEF_H
 #define APP_MSG_DEF_H
 
-#include <cstdint>
-
-// // 0x0302 - 自定义控制器（图传链路）
-// struct app_referee_custom_controller {
-//     float pos_data[3];
-//     float rpy_data[3];
-//     // uint16_t key;
-//     struct {
-//         bool key1 : 1;
-//         bool key2 : 1;
-//         bool key3 : 1;
-//         bool key4 : 1;
-//         bool key5 : 1;
-//     } __attribute__((packed)) key;
-//     float reserved;
-// } __attribute__ ((packed));
+struct app_msg_hand_to_custom {
+    bool key_state[4];
+    int16_t rs_data[2];
+} __attribute__((packed));
 
 #endif //APP_MSG_DEF_H
