@@ -83,7 +83,7 @@ Joint joint3(
         "joint3",
         DJIMotor::GM6020,
         (DJIMotor::Param) { 0x03, E_CAN1, DJIMotor::CURRENT })),
-    8142, 160, -160, 0,
+    5422, 360, -360, 0,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0)
 );
@@ -129,6 +129,14 @@ void send_msg_to_referee() {
 app_msg_hand_to_custom hand_data{};
 bool hand_state = false;
 unsigned int hand_timestamp = 0;
+//发
+void send_msg_to_chassis() {
+    app_msg_hand_to_custom pkg = {
+        .key_state = {0, 0, 0, 0},
+        .rs_data = {0, 0}
+    };
+    app_msg_can_send(E_CAN3, 0x066, pkg);
+}
 
 void hand_can_raw_recv(bsp_can_msg_t *msg) {
     hand_timestamp = bsp_time_get_ms();
@@ -219,19 +227,19 @@ void app_custom_task(void *args) {
             pos[0],
             pos[1],
             pos[2],
-            hand_data.key_state[0],
-            hand_data.key_state[1],
-            hand_data.key_state[2],
-            hand_data.key_state[3],
-            hand_data.rs_data[0],
-            hand_data.rs_data[1],
-            hand_timestamp
-            // rpy[0],
-            // rpy[1],
-            // rpy[2],
-            // joint1.motor_ctrl_->device()->angle,
-            // joint2.motor_ctrl_->device()->angle,
-            // joint3.motor_ctrl_->device()->angle
+            // hand_data.key_state[0],
+            // hand_data.key_state[1],
+            // hand_data.key_state[2],
+            // hand_data.key_state[3],
+            // hand_data.rs_data[0],
+            // hand_data.rs_data[1],
+            // hand_timestamp,
+            rpy[0],
+            rpy[1],
+            rpy[2],
+            joint1.motor_ctrl_->device()->angle,
+            joint2.motor_ctrl_->device()->angle,
+            joint3.motor_ctrl_->device()->angle
             );
 
         if(++c_count == 100) {
@@ -245,6 +253,7 @@ void app_custom_task(void *args) {
         }
 
         OS::Task::SleepMilliseconds(1);
+        send_msg_to_chassis();
     }
 }
 
