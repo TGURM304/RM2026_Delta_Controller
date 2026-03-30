@@ -30,8 +30,8 @@ using namespace Motor;
 using namespace Controller;
 
 DMMotor DM_Motor1("Motor1",DMMotor::J4310,{
-    .slave_id = 0x01,
-    .master_id = 0x11,
+    .slave_id = 0x03,
+    .master_id = 0x13,
     .port = E_CAN2,
     .mode = DMMotor::MIT,
     .p_max = 12.5, .v_max = 30, .t_max = 10, .kp_max = 500, .kd_max = 5
@@ -44,8 +44,8 @@ DMMotor DM_Motor2("Motor2",DMMotor::J4310,{
     .p_max = 12.5, .v_max = 30, .t_max = 10, .kp_max = 500, .kd_max = 5
 });
 DMMotor DM_Motor3("Motor3",DMMotor::J4310,{
-    .slave_id = 0x03,
-    .master_id = 0x13,
+    .slave_id = 0x01,
+    .master_id = 0x11,
     .port = E_CAN2,
     .mode = DMMotor::MIT,
     .p_max = 12.5, .v_max = 30, .t_max = 10, .kp_max = 500, .kd_max = 5
@@ -55,8 +55,8 @@ Joint joint1(
     std::make_unique<MotorController>(std::make_unique <DJIMotor> (
         "joint1",
         DJIMotor::GM6020,
-        (DJIMotor::Param) { 0x01, E_CAN1, DJIMotor::CURRENT })),
-    4199, 160, -160, 0,
+        (DJIMotor::Param) { 0x02, E_CAN1, DJIMotor::CURRENT })),
+    1277, 90, -90, 0,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0)
 );
@@ -71,8 +71,8 @@ Joint joint2(
     std::make_unique<MotorController>(std::make_unique <DJIMotor> (
         "joint2",
         DJIMotor::GM6020,
-        (DJIMotor::Param) { 0x02, E_CAN1, DJIMotor::CURRENT })),
-    4000, 180, -180, 1,
+        (DJIMotor::Param) { 0x03, E_CAN1, DJIMotor::CURRENT })),
+    2031, 60, -120, 1,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0),
     joint2_forward
@@ -82,8 +82,8 @@ Joint joint3(
     std::make_unique<MotorController>(std::make_unique <DJIMotor> (
         "joint3",
         DJIMotor::GM6020,
-        (DJIMotor::Param) { 0x03, E_CAN1, DJIMotor::CURRENT })),
-    5422, 360, -360, 0,
+        (DJIMotor::Param) { 0x01, E_CAN1, DJIMotor::CURRENT })),
+    1917, 720, -720, 0,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0)
 );
@@ -116,6 +116,19 @@ static void transmit(uint16_t cmd_id, uint8_t *s, uint16_t l) {
     bsp_uart_send(E_UART_REFEREE, tx_buf, sizeof(pkg_header) + sizeof(cmd_id) + l + sizeof(crc));
 }
 
+app_msg_hand_to_custom hand_data{};
+bool hand_state = false;
+unsigned int hand_timestamp = 0;
+
+void custom_callback(bsp_uart_e e, uint8_t *s, uint16_t l) {
+    if(l < sizeof(hand_data) || !CRC16::verify(s, sizeof(hand_data))) {
+        hand_data = {};
+        return;
+    }
+    hand_timestamp = bsp_time_get_ms();
+    std::copy_n(s, sizeof(hand_data), reinterpret_cast<uint8_t *>(&hand_data));
+}
+
 float pos[3], rpy[3];
 void send_msg_to_referee() {
     app_referee_custom_controller_t pkg = {
@@ -126,23 +139,23 @@ void send_msg_to_referee() {
 }
 
 // can通信
-app_msg_hand_to_custom hand_data{};
-bool hand_state = false;
-unsigned int hand_timestamp = 0;
+// app_msg_hand_to_custom hand_data{};
+// bool hand_state = false;
+// unsigned int hand_timestamp = 0;
 //发
-void send_msg_to_chassis() {
-    app_msg_hand_to_custom pkg = {
-        .key_state = {0, 0, 0, 0},
-        .rs_data = {0, 0}
-    };
-    app_msg_can_send(E_CAN3, 0x066, pkg);
-}
+// void send_msg_to_chassis() {
+//     app_msg_hand_to_custom pkg = {
+//         .key_state = {0, 0, 0, 0},
+//         .rs_data = {0, 0}
+//     };
+//     app_msg_can_send(E_CAN3, 0x066, pkg);
+// }
 
-void hand_can_raw_recv(bsp_can_msg_t *msg) {
-    hand_timestamp = bsp_time_get_ms();
-    std::copy_n(msg->data, sizeof(hand_data),
-                reinterpret_cast<uint8_t*>(&hand_data));
-}
+// void hand_can_raw_recv(bsp_can_msg_t *msg) {
+//     hand_timestamp = bsp_time_get_ms();
+//     std::copy_n(msg->data, sizeof(hand_data),
+//                 reinterpret_cast<uint8_t*>(&hand_data));
+// }
 
 // 静态任务，在 CubeMX 中配置
 void app_custom_task(void *args) {
@@ -158,11 +171,13 @@ void app_custom_task(void *args) {
 
     OS::Task::SleepMilliseconds(3000);
     
-    bsp_can_set_callback(E_CAN3, 0x147, hand_can_raw_recv);
+    // bsp_can_set_callback(E_CAN3, 0x147, hand_can_raw_recv);
+
+    bsp_uart_set_callback(E_UART_VISION, custom_callback);
 
     float tor[3] = {0, 0, 0};;
     float deg[3];
-    float target_force[3] = {0, 0, 26};
+    float target_force[3] = {25, 0, 0};
     float deg_t[3];
     float pos_t[3] = {10, -22, -200};
 
@@ -227,33 +242,33 @@ void app_custom_task(void *args) {
             pos[0],
             pos[1],
             pos[2],
+            rpy[0],
+            rpy[1],
+            rpy[2],
             // hand_data.key_state[0],
             // hand_data.key_state[1],
             // hand_data.key_state[2],
             // hand_data.key_state[3],
             // hand_data.rs_data[0],
             // hand_data.rs_data[1],
-            // hand_timestamp,
-            rpy[0],
-            rpy[1],
-            rpy[2],
+            // hand_timestamp
             joint1.motor_ctrl_->device()->angle,
             joint2.motor_ctrl_->device()->angle,
-            joint3.motor_ctrl_->device()->angle
+            joint3.motor_ctrl_->device()->angle,
+            DM_Motor1.status.torque,
+            DM_Motor1.status.t_mos,
+            DM_Motor1.status.t_rotor,
+            DM_Motor2.status.torque,
+            DM_Motor3.status.torque
             );
 
         if(++c_count == 100) {
             c_count = 0;
-            // app_msg_vofa_send(E_UART_REFEREE,
-            //             pos[0],
-            //             pos[1],
-            //             pos[2]
-            //             );
             send_msg_to_referee();
         }
 
         OS::Task::SleepMilliseconds(1);
-        send_msg_to_chassis();
+        // send_msg_to_chassis();
     }
 }
 
