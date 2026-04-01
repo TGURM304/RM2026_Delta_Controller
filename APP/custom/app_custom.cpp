@@ -14,6 +14,7 @@
 #include "app_referee.h"
 #include "app_referee_def.h"
 #include "ctrl_motor_base_pid.h"
+#include "alg_filter.h"
 
 #include "bsp_can.h"
 #include "bsp_time.h"
@@ -56,7 +57,7 @@ Joint joint1(
         "joint1",
         DJIMotor::GM6020,
         (DJIMotor::Param) { 0x02, E_CAN1, DJIMotor::CURRENT })),
-    1277, 90, -90, 0,
+    1308, 90, -90, 0,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0)
 );
@@ -72,7 +73,7 @@ Joint joint2(
         "joint2",
         DJIMotor::GM6020,
         (DJIMotor::Param) { 0x03, E_CAN1, DJIMotor::CURRENT })),
-    2031, 60, -120, 1,
+    1357, 90, -120, 1,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0),
     joint2_forward
@@ -83,7 +84,7 @@ Joint joint3(
         "joint3",
         DJIMotor::GM6020,
         (DJIMotor::Param) { 0x01, E_CAN1, DJIMotor::CURRENT })),
-    1917, 720, -720, 0,
+    758, 720, -720, 0,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0)
 );
@@ -120,20 +121,31 @@ app_msg_hand_to_custom hand_data{};
 bool hand_state = false;
 unsigned int hand_timestamp = 0;
 
+static Algorithm::LowPassFilter hand_rs_lpf0(8.0), hand_rs_lpf1(8.0);
+
 void custom_callback(bsp_uart_e e, uint8_t *s, uint16_t l) {
     if(l < sizeof(hand_data) || !CRC16::verify(s, sizeof(hand_data))) {
         hand_data = {};
+        hand_rs_lpf0.reset(0);
+        hand_rs_lpf1.reset(0);
         return;
     }
     hand_timestamp = bsp_time_get_ms();
     std::copy_n(s, sizeof(hand_data), reinterpret_cast<uint8_t *>(&hand_data));
+    const int16_t r0 = -1 * hand_data.rs_data[0];
+    const int16_t r1 = -1 * hand_data.rs_data[1];
+    hand_data.rs_data[0] = static_cast<int16_t>(hand_rs_lpf0.update(static_cast<double>(r0), 0.001));
+    hand_data.rs_data[1] = static_cast<int16_t>(hand_rs_lpf1.update(static_cast<double>(r1), 0.001));
 }
 
 float pos[3], rpy[3];
 void send_msg_to_referee() {
     app_referee_custom_controller_t pkg = {
         .pos_data = { pos[0] * 0.001f, pos[1] * 0.001f, pos[2] * 0.001f },
-        .rpy_data = { rpy[0], rpy[1], rpy[2] }
+        .rpy_data = { rpy[0], rpy[1], rpy[2] },
+        .rs_data = { hand_data.rs_data[0], hand_data.rs_data[1] },
+        .key = {hand_data.key_state[3], hand_data.key_state[1],
+            hand_data.key_state[0], hand_data.key_state[2]}
     };
     transmit(0x0302, reinterpret_cast<uint8_t *>(&pkg), sizeof(pkg));
 }
@@ -177,7 +189,7 @@ void app_custom_task(void *args) {
 
     float tor[3] = {0, 0, 0};;
     float deg[3];
-    float target_force[3] = {25, 0, 0};
+    float target_force[3] = {27, 0, 0};
     float deg_t[3];
     float pos_t[3] = {10, -22, -200};
 
@@ -245,21 +257,20 @@ void app_custom_task(void *args) {
             rpy[0],
             rpy[1],
             rpy[2],
-            // hand_data.key_state[0],
-            // hand_data.key_state[1],
-            // hand_data.key_state[2],
-            // hand_data.key_state[3],
-            // hand_data.rs_data[0],
-            // hand_data.rs_data[1],
-            // hand_timestamp
-            joint1.motor_ctrl_->device()->angle,
-            joint2.motor_ctrl_->device()->angle,
-            joint3.motor_ctrl_->device()->angle,
-            DM_Motor1.status.torque,
-            DM_Motor1.status.t_mos,
-            DM_Motor1.status.t_rotor,
-            DM_Motor2.status.torque,
-            DM_Motor3.status.torque
+            hand_data.key_state[3],
+            hand_data.key_state[1],
+            hand_data.key_state[0],
+            hand_data.key_state[2],
+            hand_data.rs_data[0],
+            hand_data.rs_data[1]
+            // joint1.motor_ctrl_->device()->angle,
+            // joint2.motor_ctrl_->device()->angle,
+            // joint3.motor_ctrl_->device()->angle,
+            // DM_Motor1.status.torque,
+            // DM_Motor1.status.t_mos,
+            // DM_Motor1.status.t_rotor,
+            // DM_Motor2.status.torque,
+            // DM_Motor3.status.torque
             );
 
         if(++c_count == 100) {

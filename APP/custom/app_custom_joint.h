@@ -10,7 +10,7 @@
 
 //0.0152 j2 杆长
 //0.524kg 质量
-#define SERIES_JOINT2_L 0.0152      //m
+#define SERIES_JOINT2_L 0.0202      //m
 #define SERIES_MASS 0.524           //kg
 #define G           9.80665
 
