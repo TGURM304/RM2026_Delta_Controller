@@ -57,7 +57,7 @@ Joint joint1(
         "joint1",
         DJIMotor::GM6020,
         (DJIMotor::Param) { 0x02, E_CAN1, DJIMotor::CURRENT })),
-    1308, 90, -90, 0,
+    1308, 120, -120, 0,
     std::make_unique <PID> (20, 2, 0.0, 16384, 1000),
     std::make_unique <PID> (2, 0, 0, 150, 0)
 );
